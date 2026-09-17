@@ -1,0 +1,60 @@
+version: 2
+
+models:
+  - name: dim_user
+    columns:
+      - name: user_id
+        tests: [not_null, unique]
+
+  - name: dim_song
+    columns:
+      - name: song_id
+        tests: [not_null, unique]
+      - name: artist_id
+        tests:
+          - not_null
+          - relationships: {to: ref('dim_artist'), field: artist_id}
+      - name: duration_ms
+        tests:
+          - dbt_utils.accepted_range: {min_value: 30000, max_value: 900000}
+
+  - name: dim_artist
+    columns:
+      - name: artist_id
+        tests: [not_null, unique]
+
+  - name: fct_listening_events
+    description: One row per listening event, orphans included and flagged.
+    tests:
+      - dbt_utils.expression_is_true:
+          expression: "ms_played <= duration_ms"
+      - dbt_utils.expression_is_true:
+          expression: "not (event_type = 'skip' and completion_rate >= 0.8)"
+      # The rows the pipeline discarded must stay a rounding error. Without this
+      # the transformation can silently swallow an entire anomaly.
+      - dbt_utils.expression_is_true:
+          expression: "not is_orphan_song"
+      - dbt_utils.expression_is_true:
+          expression: "not was_deduplicated"
+    columns:
+      - name: event_id
+        tests: [not_null, unique]
+      - name: user_id
+        tests:
+          - not_null
+          - relationships: {to: ref('dim_user'), field: user_id}
+      - name: song_id
+        tests:
+          - not_null
+          - relationships: {to: ref('dim_song'), field: song_id}
+      - name: event_type
+        tests:
+          - accepted_values: {values: [play, skip, pause, replay, like]}
+      - name: completion_rate
+        tests:
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 1}
+      - name: device_type
+        tests:
+          - accepted_values:
+              values: [mobile, desktop, web, smart_speaker]
+              config: {severity: warn}

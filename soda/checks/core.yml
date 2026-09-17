@@ -1,0 +1,60 @@
+# Behaviour of the modelled fact table. Distribution checks live here because
+# they are declared expectations about the product, with numbers a human chose.
+
+checks for CORE.FCT_LISTENING_EVENTS:
+  - row_count > 0
+  - duplicate_count(EVENT_ID) = 0
+  - freshness(EVENT_TS) < 8h:
+      warn: when > 4h
+
+  - failed rows:
+      name: Events discarded as orphans stay negligible
+      fail query: |
+        SELECT 1
+        FROM CORE.FCT_LISTENING_EVENTS
+        HAVING AVG(IFF(IS_ORPHAN_SONG, 1, 0)) > 0.001
+
+  # Event mix. A shift here is what a lost skip stream looks like.
+  - failed rows:
+      name: Skip rate stays within the declared band
+      fail query: |
+        SELECT 1
+        FROM CORE.FCT_LISTENING_EVENTS
+        WHERE EVENT_TS >= DATEADD('day', -1, CURRENT_TIMESTAMP())
+        HAVING COUNT_IF(EVENT_TYPE = 'skip')
+             / NULLIF(COUNT_IF(EVENT_TYPE IN ('play','skip','pause','replay')), 0)
+               NOT BETWEEN 0.22 AND 0.42
+
+  - failed rows:
+      name: No country segment disappears
+      fail query: |
+        WITH recent AS (
+          SELECT COUNTRY, COUNT(*) AS n
+          FROM CORE.FCT_LISTENING_EVENTS
+          WHERE EVENT_TS >= DATEADD('day', -1, CURRENT_TIMESTAMP())
+          GROUP BY COUNTRY
+        ), prior AS (
+          SELECT COUNTRY, COUNT(*) / 7.0 AS n
+          FROM CORE.FCT_LISTENING_EVENTS
+          WHERE EVENT_TS BETWEEN DATEADD('day', -8, CURRENT_TIMESTAMP())
+                             AND DATEADD('day', -1, CURRENT_TIMESTAMP())
+          GROUP BY COUNTRY
+        )
+        SELECT p.COUNTRY
+        FROM prior p LEFT JOIN recent r ON p.COUNTRY = r.COUNTRY
+        WHERE COALESCE(r.n, 0) < p.n * 0.7
+
+  - failed rows:
+      name: No device platform disappears
+      fail query: |
+        SELECT DEVICE_TYPE
+        FROM (
+          SELECT DEVICE_TYPE, COUNT(*) / SUM(COUNT(*)) OVER () AS share
+          FROM CORE.FCT_LISTENING_EVENTS
+          WHERE EVENT_TS >= DATEADD('day', -1, CURRENT_TIMESTAMP())
+          GROUP BY DEVICE_TYPE
+        )
+        WHERE DEVICE_TYPE = 'mobile' AND share < 0.35
+
+  - anomaly detection for row_count:
+      name: Daily volume follows its learned pattern

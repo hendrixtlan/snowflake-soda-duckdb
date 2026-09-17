@@ -1,0 +1,22 @@
+version: 2
+
+sources:
+  - name: raw
+    database: "{{ env_var('SNOWFLAKE_DATABASE', 'MUSIC_PREFS') }}"
+    schema: RAW
+    tables:
+      - name: listening_events
+        description: >
+          Events that passed the ingestion contract. Rows rejected by the
+          contract live in RAW.LISTENING_EVENTS_QUARANTINE, never here.
+        loaded_at_field: _ingested_at
+        freshness:
+          warn_after: {count: 6, period: hour}
+          error_after: {count: 12, period: hour}
+        columns:
+          - name: event_id
+            tests: [not_null]
+      - name: listening_events_quarantine
+        description: Rows rejected by the ingestion contract, with their reason.
+      - name: songs
+      - name: artists

@@ -1,0 +1,47 @@
+version: 2
+
+models:
+  - name: user_listening_features
+    description: One row per user, 30-day window. The deliverable of the project.
+    columns:
+      - name: user_id
+        tests:
+          - not_null
+          - unique
+          - relationships: {to: ref('dim_user'), field: user_id}
+      - name: skip_rate
+        tests: [{dbt_utils.accepted_range: {min_value: 0, max_value: 1}}]
+      - name: avg_completion_rate
+        tests: [{dbt_utils.accepted_range: {min_value: 0, max_value: 1}}]
+      - name: genre_diversity
+        tests: [{dbt_utils.accepted_range: {min_value: 0, max_value: 1}}]
+      - name: top_genre_share
+        tests: [{dbt_utils.accepted_range: {min_value: 0, max_value: 1}}]
+      - name: activity_tier
+        tests: [{accepted_values: {values: [heavy, regular, casual, dormant]}}]
+      - name: top_genre
+        tests: [not_null]
+
+  - name: user_genre_profile
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [user_id, genre]
+    columns:
+      - name: user_id
+        tests: [not_null]
+      - name: affinity_score
+        tests: [{dbt_utils.accepted_range: {min_value: 0, max_value: 1}}]
+
+  - name: user_song_affinity
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [user_id, song_id]
+    columns:
+      - name: user_id
+        tests: [not_null]
+      - name: song_id
+        tests:
+          - not_null
+          - relationships: {to: ref('dim_song'), field: song_id}
+      - name: affinity_score
+        tests: [{dbt_utils.accepted_range: {min_value: 0, max_value: 1}}]

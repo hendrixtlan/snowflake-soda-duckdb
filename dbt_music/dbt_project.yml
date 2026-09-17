@@ -1,0 +1,23 @@
+name: music_data_reliability
+version: "0.1.0"
+config-version: 2
+profile: music_data_reliability
+
+model-paths: ["models"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+
+vars:
+  n_genres: 12
+
+models:
+  music_data_reliability:
+    staging:
+      +schema: STAGING
+      +materialized: view
+    core:
+      +schema: CORE
+      +materialized: incremental
+    marts:
+      +schema: MARTS
+      +materialized: table

@@ -1,0 +1,37 @@
+# The consumer's contract: what has to hold for the feature set to be usable.
+
+checks for MARTS.USER_LISTENING_FEATURES:
+  - row_count > 0
+  - missing_count(USER_ID) = 0
+  - duplicate_count(USER_ID) = 0
+  - missing_percent(TOP_GENRE) < 3:
+      warn: when > 1
+  - invalid_count(SKIP_RATE) = 0:
+      valid min: 0
+      valid max: 1
+  - invalid_count(AVG_COMPLETION_RATE) = 0:
+      valid min: 0
+      valid max: 1
+  - invalid_count(GENRE_DIVERSITY) = 0:
+      valid min: 0
+      valid max: 1
+  - freshness(FEATURE_COMPUTED_AT) < 26h
+
+  - failed rows:
+      name: At least 90 percent of users have enough signal to profile
+      fail query: |
+        SELECT 1
+        FROM MARTS.USER_LISTENING_FEATURES
+        HAVING AVG(IFF(FEATURE_ELIGIBLE, 1, 0)) < 0.90
+
+  - failed rows:
+      name: Completion rate has not drifted against the trailing week
+      fail query: |
+        SELECT 1
+        FROM MARTS.USER_LISTENING_FEATURES
+        HAVING AVG(AVG_COMPLETION_RATE) NOT BETWEEN 0.55 AND 0.85
+
+checks for MARTS.USER_SONG_AFFINITY:
+  - invalid_count(AFFINITY_SCORE) = 0:
+      valid min: 0
+      valid max: 1

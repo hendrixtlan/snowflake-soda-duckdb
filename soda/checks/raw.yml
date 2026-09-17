@@ -1,0 +1,22 @@
+# SLOs at the landing zone. These are negotiated tolerances, not domain truths:
+# the contract (Great Expectations) already rejected what is impossible.
+
+checks for RAW.LISTENING_EVENTS:
+  - row_count > 0
+  - freshness(_INGESTED_AT) < 8h:
+      warn: when > 4h
+  - missing_percent(COUNTRY) < 5:
+      warn: when > 2
+  - missing_percent(DEVICE_TYPE) < 8:
+      warn: when > 3
+  # Volume against its own history. Monte Carlo learns the band; this is the
+  # floor the business will not accept regardless of what the model learned.
+  - change avg last 7 for row_count < 40%:
+      warn: when > 20%
+
+checks for RAW.LISTENING_EVENTS_QUARANTINE:
+  # The contract is allowed to reject a trickle. A flood means the producer
+  # changed and nobody told us.
+  - row_count < 1000:
+      name: Quarantine volume stays low
+      warn: when > 200

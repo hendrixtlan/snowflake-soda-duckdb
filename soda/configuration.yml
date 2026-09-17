@@ -1,0 +1,16 @@
+data_source snowflake:
+  type: snowflake
+  connection:
+    account: ${SNOWFLAKE_ACCOUNT}
+    username: ${SNOWFLAKE_USER}
+    password: ${SNOWFLAKE_PASSWORD}
+    database: ${SNOWFLAKE_DATABASE}
+    warehouse: ${SNOWFLAKE_WAREHOUSE}
+    role: ${SNOWFLAKE_ROLE}
+    schema: MARTS
+
+soda_cloud:
+  # Optional. Without it, scans still run and write results locally.
+  host: cloud.soda.io
+  api_key_id: ${SODA_API_KEY_ID}
+  api_key_secret: ${SODA_API_KEY_SECRET}

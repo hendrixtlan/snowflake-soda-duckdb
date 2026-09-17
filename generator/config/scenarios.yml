@@ -1,0 +1,29 @@
+genres:
+  - pop
+  - rock
+  - indie_rock
+  - hip_hop
+  - electronic
+  - reggaeton
+  - jazz
+  - classical
+  - metal
+  - r_and_b
+  - country
+  - latin
+
+countries:
+  MX: 0.35
+  US: 0.25
+  BR: 0.15
+  ES: 0.08
+  AR: 0.07
+  CO: 0.05
+  CL: 0.05
+
+event_type_weights:
+  play: 0.50
+  skip: 0.31
+  pause: 0.08
+  replay: 0.06
+  like: 0.05

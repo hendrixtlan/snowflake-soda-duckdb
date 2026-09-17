@@ -1,0 +1,21 @@
+# The HYPOTHESIS, kept apart from the measurement on purpose.
+#
+# build_matrix.py never reads this file to fill the matrix -- only to diff it
+# against what actually happened. An expectation that turns out wrong is a
+# finding to write up, not a number to quietly correct.
+
+expected:
+  A1:  [great_expectations, dbt, soda]
+  A2:  [great_expectations, dbt]
+  A3:  [great_expectations, dbt]
+  A4:  [great_expectations, dbt, soda]
+  A5:  [dbt]
+  A6:  [great_expectations, dbt, monte_carlo]
+  A7:  [dbt, soda, monte_carlo]
+  A8:  [soda, monte_carlo]
+  A9:  [soda, monte_carlo]
+  A10: [soda, monte_carlo]
+  A11: [monte_carlo]
+  A12: [monte_carlo]
+  A13: [soda]
+  A14: [great_expectations, dbt, monte_carlo]

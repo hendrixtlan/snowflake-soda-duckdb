@@ -1,0 +1,57 @@
+# Monte Carlo monitors as code.
+#
+# Note what is absent: thresholds. Monte Carlo learns the normal band for each
+# metric from history. The moment a threshold is written here, the control stops
+# being observability and becomes a Soda check wearing a different name.
+
+montecarlo:
+  field_health:
+    - table: music_prefs:music_prefs.core.fct_listening_events
+      timestamp_field: event_ts
+      fields: [event_type, ms_played, country, device_type, genre, completion_rate]
+      schedule: {type: fixed, interval_minutes: 60, start_time: "2026-01-01T00:00:00"}
+
+    - table: music_prefs:music_prefs.marts.user_song_affinity
+      fields: [affinity_score]
+      schedule: {type: fixed, interval_minutes: 720, start_time: "2026-01-01T00:00:00"}
+
+  custom_sql:
+    - name: listening_behaviour_daily
+      description: Behavioural ratios that are not columns, so field health cannot see them.
+      sql: |
+        SELECT
+          DATE_TRUNC('day', EVENT_TS)                                       AS day,
+          COUNT_IF(EVENT_TYPE = 'skip')
+            / NULLIF(COUNT_IF(EVENT_TYPE IN ('play','skip','pause','replay')), 0) AS skip_rate,
+          AVG(MS_PLAYED / NULLIF(DURATION_MS, 0))                           AS avg_completion_rate,
+          COUNT(DISTINCT USER_ID)                                           AS active_users,
+          COUNT(DISTINCT SESSION_ID)                                        AS sessions,
+          COUNT(*) / NULLIF(COUNT(DISTINCT USER_ID), 0)                     AS events_per_user
+        FROM MUSIC_PREFS.CORE.FCT_LISTENING_EVENTS
+        GROUP BY 1
+      schedule: {type: fixed, interval_minutes: 360, start_time: "2026-01-01T00:00:00"}
+
+    - name: segment_volume_daily
+      description: Per-segment volume, so a country or platform going quiet is visible.
+      sql: |
+        SELECT
+          DATE_TRUNC('day', EVENT_TS) AS day,
+          COUNTRY,
+          DEVICE_TYPE,
+          COUNT(*) AS events
+        FROM MUSIC_PREFS.CORE.FCT_LISTENING_EVENTS
+        GROUP BY 1, 2, 3
+      schedule: {type: fixed, interval_minutes: 360, start_time: "2026-01-01T00:00:00"}
+
+    - name: feature_coverage_daily
+      description: Share of active users that ended up with a usable profile.
+      sql: |
+        SELECT
+          CURRENT_DATE() AS day,
+          (SELECT COUNT(*) FROM MUSIC_PREFS.MARTS.USER_LISTENING_FEATURES
+            WHERE FEATURE_ELIGIBLE)
+          / NULLIF((SELECT COUNT(DISTINCT USER_ID)
+                    FROM MUSIC_PREFS.CORE.FCT_LISTENING_EVENTS
+                    WHERE EVENT_TS >= DATEADD('day', -30, CURRENT_TIMESTAMP())), 0)
+          AS eligible_user_ratio
+      schedule: {type: fixed, interval_minutes: 720, start_time: "2026-01-01T00:00:00"}
