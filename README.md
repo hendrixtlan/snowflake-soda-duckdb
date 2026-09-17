@@ -1,52 +1,54 @@
 # Music Data Reliability
 
-Prototipo de **Data Reliability** y **Data Observability** sobre un sistema de análisis de preferencias musicales.
+[English](README.md) · [Español](README.es.md)
 
-Cuatro capas de control independientes —contrato de entrada, transformación, SLOs y observabilidad— protegen un dataset de features destinado a alimentar un motor de recomendación. El proyecto no afirma que las cuatro sean necesarias: lo mide.
+A **Data Reliability** and **Data Observability** prototype built on a music-preference analytics system.
 
-## La tesis
+Four independent layers of control — an ingestion contract, transformation, SLOs and observability — protect a feature set destined to feed a recommendation engine. The project does not assert that all four are necessary: it measures it.
 
-Un sistema de preferencias musicales infiere el gusto del comportamiento, sin calificaciones explícitas contra las cuales contrastar. Un evento corrupto no es un registro perdido: es una opinión falsificada atribuida a una persona real.
+## The thesis
 
-Las fallas se dividen en dos familias con naturalezas opuestas:
+A music-preference system infers taste from behaviour, with no explicit ratings to check against. A corrupted event is not a lost record; it is a falsified opinion attributed to a real person.
 
-- Un `ms_played` mayor que la duración de la canción es **imposible** y se puede escribir como regla.
-- Un `ms_played` inflado un 25% es **plausible en cada fila** y solo se ve comparando la distribución contra su historia.
+Failures fall into two families with opposite natures:
 
-Las dos rompen el producto por igual, y ningún tipo de control detecta ambas. La demostración es la matriz de detección: 14 anomalías contra 4 controles, medida y no declarada.
+- An `ms_played` greater than the track's duration is **impossible**, and can be written down as a rule.
+- An `ms_played` inflated by 25% is **plausible on every single row**, and only shows up when the distribution is compared against its own history.
 
-## Separación de responsabilidades
+Both break the product equally, and neither kind of control catches both. The demonstration is the detection matrix: 14 anomalies against 4 controls, measured rather than declared.
 
-| Control | Pregunta que responde | Capa | Ante falla |
+## Separation of responsibilities
+
+| Control | Question it answers | Layer | On failure |
 | --- | --- | --- | --- |
-| Great Expectations | ¿El dato entrante cumple el contrato? | Pre-`RAW` | Bloquea o pone en cuarentena |
-| dbt tests | ¿El modelo es estructuralmente coherente? | `STAGING`, `CORE` | Falla el build |
-| Soda | ¿El dataset cumple su SLO? | `CORE`, `MARTS` | Alerta y retira la certificación |
-| Monte Carlo | ¿El dato se comporta como siempre? | Todas | Alerta con lineage |
+| Great Expectations | Does the incoming data satisfy the contract? | Pre-`RAW` | Blocks or quarantines |
+| dbt tests | Is the model structurally coherent? | `STAGING`, `CORE` | Fails the build |
+| Soda | Does the dataset meet its SLO? | `CORE`, `MARTS` | Alerts, withdraws certification |
+| Monte Carlo | Is the data behaving as it always has? | All | Alerts with lineage |
 
-Reglas de no-duplicación, aplicadas en el código:
+Non-duplication rules, enforced in the code:
 
-1. Un chequeo se declara una sola vez, en la capa donde primero es exigible.
-2. Great Expectations no valida tablas transformadas; su dominio termina en `RAW`.
-3. Soda no reimplementa tests estructurales de dbt.
-4. **Monte Carlo no recibe umbrales.** En el momento en que se le escribe uno, deja de ser observabilidad y pasa a ser un check de Soda con otro nombre.
+1. A check is declared once, in the layer where it first becomes enforceable.
+2. Great Expectations never validates transformed tables; its domain ends at `RAW`.
+3. Soda does not reimplement dbt's structural tests.
+4. **Monte Carlo is given no thresholds.** The moment one is written, the control stops being observability and becomes a Soda check under a different name.
 
-## Dos decisiones de diseño que sostienen todo
+## Two design decisions that hold everything up
 
-**Nada se descarta en silencio.** `stg_listening_events` deduplica, pero marca cada fila con `was_deduplicated`. `fct_listening_events` usa `LEFT JOIN` contra el catálogo y marca `is_orphan_song` en vez de filtrar. `stg_rejected_events` reúne todo lo descartado con su motivo. Un test que pasa porque las filas ofensivas fueron eliminadas antes es peor que no tener test: reporta una salud fabricada por el propio pipeline.
+**Nothing is discarded silently.** `stg_listening_events` deduplicates, but flags every row with `was_deduplicated`. `fct_listening_events` uses a `LEFT JOIN` against the catalogue and flags `is_orphan_song` instead of filtering. `stg_rejected_events` gathers everything dropped, with its reason. A test that passes because the offending rows were removed upstream is worse than no test at all: it reports health manufactured by the very pipeline it was meant to audit.
 
-**La certificación la decide Soda, no dbt.** `feature_eligible` es una propiedad del usuario (tiene señal suficiente para perfilarlo). `MARTS.DATA_QUALITY_STATUS.CERTIFIED` es una propiedad del dataset y la escribe `certify.py` leyendo el resultado del scan. Un dataset que reprueba sus checks no puede certificarse a sí mismo.
+**Certification is decided by Soda, not dbt.** `feature_eligible` is a property of the user (enough signal to profile them). `MARTS.DATA_QUALITY_STATUS.CERTIFIED` is a property of the dataset, written by `certify.py` from the scan result. A dataset cannot certify itself while failing its own checks.
 
-## Requisitos
+## Requirements
 
-| Requisito | Versión | Notas |
+| Requirement | Version | Notes |
 | --- | --- | --- |
-| Python | 3.11 | El pin de `numpy<2` lo impone Great Expectations 0.18 |
+| Python | 3.11 | The `numpy<2` pin comes from Great Expectations 0.18 |
 | Docker + Compose | 24.0 / v2 | Kafka, Redis, LocalStack |
-| Cuenta Snowflake | Trial alcanza | Único servicio remoto obligatorio |
-| Cuenta Monte Carlo | — | Opcional: sin ella el pipeline corre con tres capas |
+| Snowflake account | A trial is enough | The only mandatory remote service |
+| Monte Carlo account | — | Optional: without it the pipeline runs on three layers |
 
-## Puesta en marcha
+## Getting started
 
 ```bash
 cp .env.example .env && $EDITOR .env
@@ -56,84 +58,84 @@ make snowflake-init
 make pipeline
 ```
 
-`make help` lista todos los targets.
+`make help` lists every target.
 
-## El experimento
+## The experiment
 
 ```bash
-make baseline                 # 14 días de historia limpia
-make experiment ANOMALY=A9    # inyecta, corre el pipeline y mide
-make experiment-all           # las 14
-make matrix                   # construye la matriz observada
+make baseline                 # 14 days of clean history
+make experiment ANOMALY=A9    # inject, run the pipeline, measure
+make experiment-all           # all 14
+make matrix                   # build the observed matrix
 ```
 
-`run_injection.py` inyecta una anomalía, ejecuta el pipeline completo y escribe una fila por cada par (anomalía × control) con lo observado y la latencia de detección. Distingue tres estados, no dos: **detectó**, **no detectó**, y **control no disponible**. Una herramienta ausente y una herramienta que no se dio cuenta son hallazgos distintos.
-
-`build_matrix.py` solo lee esas corridas. Si no hay ninguna, falla:
+`run_injection.py` injects one anomaly, runs the full pipeline and writes a row per (anomaly × control) pair with what was observed and the latency since injection. `build_matrix.py` reads only those runs. If there are none, it fails:
 
 ```
 No runs found in experiment/results/.
 The matrix is measured, not declared: run `make experiment` first.
 ```
 
-La hipótesis vive aparte, en `experiment/expected_matrix.yml`, y el reporte contrasta lo observado contra ella. Una expectativa que resulta falsa es un hallazgo para escribir, no un número para corregir en silencio.
+The hypothesis lives separately, in `experiment/expected_matrix.yml`, and the report diffs the observed matrix against it. An expectation that turns out to be wrong is a finding to write up, not a number to quietly correct.
 
-### Catálogo de anomalías
+Three states are recorded, not two: **detected**, **not detected**, and **control unavailable**. A tool that is absent and a tool that failed to notice are different findings, and collapsing them invalidates the matrix. When the contract rejects a batch, dbt and Soda are marked unavailable — they never got to see the anomaly.
 
-| # | Anomalía | Familia |
+### Anomaly catalogue
+
+| # | Anomaly | Family |
 | --- | --- | --- |
-| A1 | `user_id` nulo en 3% | Determinística |
-| A2 | `ms_played` mayor que `duration_ms` | Determinística |
-| A3 | `event_type` desconocido (`share`) | Determinística |
-| A4 | `event_id` duplicado en 1% | Determinística |
-| A5 | `song_id` fuera del catálogo | Estructural |
-| A6 | Columna `country` eliminada | Estructural |
-| A7 | Retraso de carga de 10 h | Temporal |
-| A8 | Caída del 40% de eventos de `BR` | Comportamental |
-| A9 | Skip rate de 32% a 19% | Comportamental |
-| A10 | Volumen duplicado | Comportamental |
-| A11 | `mobile` reetiquetado como otras plataformas | Comportamental |
-| A12 | `ms_played` desplazado +25% | Comportamental |
-| A13 | 15% de usuarios reducidos a un evento | Cobertura |
-| A14 | `duration_ms` de INTEGER a STRING | Estructural |
+| A1 | `user_id` null in 3% of rows | Deterministic |
+| A2 | `ms_played` greater than `duration_ms` | Deterministic |
+| A3 | Unknown `event_type` (`share`) | Deterministic |
+| A4 | `event_id` duplicated in 1% of rows | Deterministic |
+| A5 | `song_id` outside the catalogue | Structural |
+| A6 | `country` column dropped | Structural |
+| A7 | 10-hour load delay | Temporal |
+| A8 | 40% drop in `BR` events | Behavioural |
+| A9 | Skip rate falls from 32% to 19% | Behavioural |
+| A10 | Volume doubles | Behavioural |
+| A11 | `mobile` relabelled as other platforms | Behavioural |
+| A12 | `ms_played` shifted +25% | Behavioural |
+| A13 | 15% of users reduced to a single event | Coverage |
+| A14 | `duration_ms` changes from INTEGER to STRING | Structural |
 
-A11 **reetiqueta** en lugar de borrar. Eliminando las filas se perdería el 57% del volumen y cualquier monitor de volumen lo vería; el punto de A11 es una anomalía visible únicamente en la distribución de un campo.
+A11 **relabels** rather than deletes. Deleting those rows would take 57% of the volume with them and any volume monitor would see it; the point of A11 is an anomaly visible only in the distribution of a field.
 
-A7 retrasa `event_ts` **y** `_ingested_at`. Mover solo el primero dejaría ciego a `dbt source freshness`, que es justamente el control que debe atraparlo.
+A7 delays `event_ts` **and** `_ingested_at`. Moving only the first would blind `dbt source freshness`, which is precisely the control meant to catch it.
 
-## Modelo de datos
+## Data model
 
-El contrato está en [`ingestion/great_expectations/contract.yml`](ingestion/great_expectations/contract.yml). Ese archivo **es** el contrato: `validate_batch.py` no contiene reglas propias, solo ejecuta lo declarado ahí. Cambiarlo es un pull request revisable.
+The contract lives in [`ingestion/great_expectations/contract.yml`](ingestion/great_expectations/contract.yml). That file **is** the contract: `validate_batch.py` holds no rules of its own, it only executes what is declared there. Changing it is a reviewable pull request.
 
-Invariantes del dominio:
+Domain invariants:
 
 - `ms_played <= duration_ms`
-- Un `skip` implica `ms_played < duration_ms * 0.8`
-- Un `like` puede tener `ms_played` en 0
-- Un `song_id` mapea siempre al mismo `artist_id` y al mismo `genre`
-- Los eventos de una `session_id` pertenecen a un solo `user_id`
+- A `skip` implies `ms_played < duration_ms * 0.8`
+- A `like` may have `ms_played` of 0
+- A `song_id` always maps to the same `artist_id` and `genre`
+- Events sharing a `session_id` belong to a single `user_id`
 
-Política de fallo: violaciones de fila van a cuarentena con su motivo; si superan el 5% del lote, se rechaza el lote entero. Una falla de esquema rechaza el lote sin importar el porcentaje, porque el esquema no es una propiedad por fila.
+Failure policy: row-level violations go to quarantine with their reason; past 5% of the batch, the whole batch is rejected. A schema failure rejects the batch regardless of percentage, because a schema is not a per-row property.
 
-### Capas
+### Layers
 
-| Esquema | Contenido | Garantía |
+| Schema | Contents | Guarantee |
 | --- | --- | --- |
-| `RAW` | Eventos que pasaron el contrato, con `_batch_id` | Inmutable |
-| `RAW.LISTENING_EVENTS_QUARANTINE` | Rechazados, con motivo | Auditable |
-| `STAGING` | Tipado, deduplicado y marcado | Un registro por evento |
-| `CORE` | `dim_*` y `fct_listening_events` | Integridad, huérfanos marcados |
-| `MARTS` | Features y afinidades, ventana de 30 días | Certificable |
+| `RAW` | Events that passed the contract, with `_batch_id` | Immutable |
+| `RAW.LISTENING_EVENTS_QUARANTINE` | Rejected rows, with the reason | Auditable |
+| `STAGING` | Typed, deduplicated and flagged | One record per event |
+| `CORE` | `dim_*` and `fct_listening_events` | Referential integrity, orphans flagged |
+| `MARTS` | Features and affinities, 30-day window | Certifiable |
 
-Salida principal: `MARTS.USER_LISTENING_FEATURES`, una fila por usuario con `top_genre`, `genre_diversity` (entropía de Shannon normalizada), `skip_rate`, `replay_rate`, `like_rate`, `sessions_30d`, `avg_session_minutes`, `activity_tier` y `feature_eligible`.
+Primary output: `MARTS.USER_LISTENING_FEATURES`, one row per user with `top_genre`, `genre_diversity` (normalised Shannon entropy), `skip_rate`, `replay_rate`, `like_rate`, `sessions_30d`, `avg_session_minutes`, `activity_tier` and `feature_eligible`.
 
-## Generador
+## Generator
 
-Vectorizado: 100.000 eventos en menos de un segundo.
+Vectorised: 100,000 events in under a second.
 
-- **Estacionalidad horaria y semanal.** Monte Carlo necesita una forma que aprender; timestamps uniformes no le enseñan nada.
-- **Sesiones reales**: eventos contiguos del mismo usuario con menos de 30 minutos de separación. Sin esto, cualquier feature de sesión es ruido.
-- **Reproducible**: con `--seed` y `--as-of` fijos, dos corridas producen frames idénticos. Sin `--as-of` el output depende del reloj y el experimento no es reproducible.
+- **Hourly and weekly seasonality.** Monte Carlo needs a shape to learn from; uniform timestamps teach it nothing.
+- **Real sessions**: contiguous events from the same user less than 30 minutes apart. Without this, any session feature is noise.
+- **Reproducible**: with `--seed` and `--as-of` pinned, two runs produce identical frames. Without `--as-of` the output depends on the wall clock and the experiment is not reproducible.
 
 ```bash
 make generate DAYS=7 AS_OF=2026-09-16T00:00:00
@@ -142,25 +144,25 @@ make generate DAYS=7 AS_OF=2026-09-16T00:00:00
 ## Tests
 
 ```bash
-make verify       # todo lo verificable sin warehouse: lint + 58 tests
-make test         # suite de pytest
-make test-models  # el SQL real de dbt sobre DuckDB
-make lint         # dbt parse + gramática Snowflake vía sqlfluff
+make verify       # everything checkable without a warehouse: lint + 58 tests
+make test         # pytest suite
+make test-models  # the real dbt SQL, on DuckDB
+make lint         # dbt parse + Snowflake grammar via sqlfluff
 ```
 
-Snowflake es el único servicio remoto y no hace falta para validar casi nada. Tres capas de verificación cubren lo que se puede cubrir sin él:
+Snowflake is the only remote service, and almost nothing needs it to be validated. Three verification layers cover what can be covered without it:
 
-| Capa | Qué prueba | Qué no prueba |
+| Layer | What it proves | What it does not |
 | --- | --- | --- |
-| `dbt parse` | Refs, Jinja, YAML, grafo de dependencias | No ejecuta ninguna consulta |
-| `sqlfluff` | Que el SQL parsee contra la gramática de Snowflake | No valida semántica ni tipos |
-| DuckDB | El SQL real de los modelos sobre datos generados | DuckDB no es Snowflake |
+| `dbt parse` | Refs, Jinja, YAML, dependency graph | Runs no query at all |
+| `sqlfluff` | That the SQL parses against the Snowflake grammar | No semantics, no types |
+| DuckDB | The real model SQL against generated data | DuckDB is not Snowflake |
 
-`sqlfluff` está configurado como puerta de sintaxis, no de estilo: la lista de reglas se reduce a una trivial, porque los errores de parseo y de plantilla se reportan igual. Un linter discutiendo espacios entrena a todo el mundo a ignorar la única señal que importa.
+`sqlfluff` is configured as a syntax gate, not a style gate: the active rule list is narrowed to a single trivial rule, because parsing and templating errors are reported regardless. A linter arguing about whitespace trains everyone to ignore its output, and with it the one signal that matters.
 
-La suite cubre cuatro cosas: que el generador sea reproducible y respete las invariantes, que **cada anomalía haga lo que su nombre afirma**, que el contrato acepte lo limpio y rechace exactamente lo prohibido, y que los modelos produzcan la aritmética correcta.
+The suite covers four things: that the generator is reproducible and respects the invariants, that **every anomaly does what its name claims**, that the contract accepts what is clean and rejects exactly what is forbidden, and that the models produce the right arithmetic.
 
-El tercer grupo incluye la prueba que da sentido al proyecto:
+The third group includes the test that gives the project its point:
 
 ```python
 @pytest.mark.parametrize("anomaly", ["A5","A7","A8","A9","A10","A11","A12","A13"])
@@ -168,32 +170,32 @@ def test_behavioural_anomalies_pass_the_contract(...):
     assert res["verdict"] == "accepted"
 ```
 
-Ocho anomalías **deben** atravesar el control determinístico sin una sola falla. Si alguna fuera atrapada ahí, el argumento a favor de una capa de comportamiento se debilitaría.
+Eight anomalies **must** sail through the deterministic control without a single failure. If any were caught there, the case for a behavioural layer would be weaker.
 
-Sin estos tests, un falso negativo en la matriz podría ser un bug del inyector en lugar de un punto ciego del control, y no habría forma de distinguirlo.
+Without these tests, a false negative in the matrix could be a bug in the injector rather than a blind spot in a control, and there would be no way to tell the two apart.
 
-`test_model_semantics.py` ejecuta el SQL **sin modificar** de los once modelos contra datos generados, con tres funciones adaptadas (`iff`, `dateadd`, `current_timestamp()`) porque DuckDB las escribe distinto. Verifica lo que ninguna de las otras capas puede: que la entropía quede en [0,1], que las afinidades por género sumen 1, que la normalización min-max sea por usuario, y que un `song_id` huérfano llegue marcado a la tabla de hechos en vez de desaparecer.
+`test_model_semantics.py` runs the **unmodified** SQL of all eleven models against generated data, with three functions shimmed (`iff`, `dateadd`, `current_timestamp()`) because DuckDB spells them differently. It verifies what none of the other layers can: that entropy stays within [0,1], that genre affinities sum to 1 per user, that min-max normalisation really is per user, and that an orphan `song_id` arrives at the fact table flagged instead of disappearing.
 
-Esa última prueba falla si alguien revierte el `LEFT JOIN` a un join interno. Es la regresión más peligrosa del proyecto y ahora tiene un test que la atrapa.
+That last test fails if anyone reverts the `LEFT JOIN` to an inner join. It is the most dangerous regression in the project, and it now has a test that catches it.
 
-## Estructura
+## Layout
 
 ```
-generator/          catálogo, eventos y las 14 anomalías
-ingestion/          contrato YAML, gate, carga idempotente, certificación
-dbt_music/          staging → core → marts, tests y contratos
-soda/               checks de raw, core y marts
-montecarlo/         monitores como código, sin umbrales
-experiment/         arnés de medición e hipótesis
-infra/snowflake/    bootstrap idempotente
+generator/          catalogue, events and the 14 anomalies
+ingestion/          YAML contract, gate, idempotent load, certification
+dbt_music/          staging → core → marts, tests and contracts
+soda/               checks for raw, core and marts
+montecarlo/         monitors as code, with no thresholds
+experiment/         measurement harness and hypothesis
+infra/snowflake/    idempotent bootstrap
 tests/              pytest
-docs/               contrato y matriz observada
+docs/               contract and observed matrix
 ```
 
-## Estado
+## Status
 
-Implementado y verificado localmente: generador, anomalías, contrato de ingesta con cuarentena, arnés de medición, suite de tests.
+Implemented and verified locally: generator, anomalies, ingestion contract with quarantine, measurement harness, test suite, model semantics.
 
-Requiere Snowflake solo para la ejecución real: `dbt build` contra el warehouse, los scans de Soda y la certificación. La lógica de los modelos y su sintaxis ya están verificadas sin él. Requiere cuenta de Monte Carlo: la cuarta columna de la matriz.
+Snowflake is needed only for real execution: `dbt build` against the warehouse, Soda scans and certification. The models' logic and syntax are already verified without it. A Monte Carlo account is needed for the fourth column of the matrix.
 
-Fuera de alcance en esta fase: entrenamiento de modelos, API de serving, streaming en producción y operación multi-región.
+Out of scope in this phase: model training, a serving API, production streaming and multi-region operation.
